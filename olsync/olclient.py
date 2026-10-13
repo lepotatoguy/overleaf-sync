@@ -12,7 +12,7 @@
 import requests as reqs
 from bs4 import BeautifulSoup
 import json
-import uuid
+import mimetypes
 from socketIO_client import SocketIO
 import time
 
@@ -242,19 +242,28 @@ class OverleafClient(object):
                     current_overleaf_folder.append(new_folder)
                     folder_id = new_folder['_id']
                     current_overleaf_folder = new_folder['folders']
+        # The current upload endpoint reads the file name from the `name` form field (the old qq* query
+        # parameters now give 422 invalid_filename) and expects the CSRF token as a header
+        base_name = file_name.split(PATH_SEP)[-1]
+        content_type = mimetypes.guess_type(base_name)[0] or "application/octet-stream"
         params = {
             "folder_id": folder_id,
-            "_csrf": self._csrf,
-            "qquuid": str(uuid.uuid4()),
-            "qqfilename": file_name,
-            "qqtotalfilesize": file_size,
+        }
+        headers = {
+            "X-Csrf-Token": self._csrf
+        }
+        data = {
+            "name": base_name,
+            "type": content_type,
+            "relativePath": "null",
         }
         files = {
-            "qqfile": file
+            "qqfile": (base_name, file, content_type)
         }
 
         # Upload the file to the predefined folder
-        r = reqs.post(UPLOAD_URL.format(project_id), cookies=self._cookie, params=params, files=files)
+        r = reqs.post(UPLOAD_URL.format(project_id), cookies=self._cookie, params=params, headers=headers,
+                      data=data, files=files)
 
         # Raise instead of returning False, the sync loop ignores return values and would report success
         if not (r.status_code == 200 and json.loads(r.content).get("success")):
