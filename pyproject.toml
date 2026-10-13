@@ -1,6 +1,6 @@
 [build-system]
-requires = ["flit"]
-build-backend = "flit.buildapi"
+requires = ["flit_core >=2,<4"]
+build-backend = "flit_core.buildapi"
 
 [tool.flit.metadata]
 module = "olsync"
@@ -13,7 +13,7 @@ classifiers = ["License :: OSI Approved :: MIT License", "Intended Audience :: S
 requires-python = ">=3"
 requires = [
     "requests == 2.*",
-    "beautifulsoup4 == 4.11.1",
+    "beautifulsoup4 >= 4.11.1, < 5",
     "yaspin == 2.*",
     "python-dateutil~=2.8.1",
     "click == 8.*",

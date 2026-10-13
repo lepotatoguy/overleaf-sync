@@ -59,7 +59,8 @@ class OlBrowserLoginWindow(QMainWindow):
             self._login_success = True
             QCoreApplication.quit()
 
-        if self.webview.url().toString() == PROJECT_URL:
+        # The dashboard URL may carry a query string or trailing slash after login
+        if self.webview.url().toString().split('?')[0].rstrip('/') == PROJECT_URL:
             self.webview.page().runJavaScript(
                 JAVASCRIPT_CSRF_EXTRACTOR, 0, callback
             )
