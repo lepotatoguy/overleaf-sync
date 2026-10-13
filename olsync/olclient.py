@@ -27,6 +27,7 @@ DELETE_URL = "https://www.overleaf.com/project/{}/doc/{}"  # The URL to delete f
 COMPILE_URL = "https://www.overleaf.com/project/{}/compile?enable_pdf_caching=true"  # The URL to compile the project
 BASE_URL = "https://www.overleaf.com"  # The Overleaf Base URL
 PATH_SEP = "/"  # Use hardcoded path separator for both windows and posix system
+JOIN_PROJECT_TIMEOUT = 20  # Seconds to wait for the project details from the Overleaf Socket.IO
 
 class OverleafClient(object):
     """
@@ -82,15 +83,33 @@ class OverleafClient(object):
 
             return {"cookie": self._cookie, "csrf": self._csrf}
 
+    def _fetch_projects(self):
+        """
+        Scrape the project list from the dashboard
+        Newer Overleaf versions embed it as {"totalSize", "projects"} in the `ol-prefetchedProjectsBlob` meta tag;
+        older versions used a plain list in `ol-projects`.
+        Returns: List of raw project objects
+        """
+        projects_page = reqs.get(PROJECT_URL, cookies=self._cookie)
+        projects_page.raise_for_status()
+        soup = BeautifulSoup(projects_page.content, 'html.parser')
+
+        blob_meta = soup.find('meta', {'name': 'ol-prefetchedProjectsBlob'})
+        if blob_meta is not None:
+            return json.loads(blob_meta.get('content'))['projects']
+
+        legacy_meta = soup.find('meta', {'name': 'ol-projects'})
+        if legacy_meta is not None:
+            return json.loads(legacy_meta.get('content'))
+
+        raise reqs.HTTPError("Project list not found on dashboard. Is the persisted cookie still valid?")
+
     def all_projects(self):
         """
         Get all of a user's active projects (= not archived and not trashed)
         Returns: List of project objects
         """
-        projects_page = reqs.get(PROJECT_URL, cookies=self._cookie)
-        json_content = json.loads(
-            BeautifulSoup(projects_page.content, 'html.parser').find('meta', {'name': 'ol-projects'}).get('content'))
-        return list(OverleafClient.filter_projects(json_content))
+        return list(OverleafClient.filter_projects(self._fetch_projects()))
 
     def get_project(self, project_name):
         """
@@ -99,10 +118,7 @@ class OverleafClient(object):
         Returns: project object
         """
 
-        projects_page = reqs.get(PROJECT_URL, cookies=self._cookie)
-        json_content = json.loads(
-            BeautifulSoup(projects_page.content, 'html.parser').find('meta', {'name': 'ol-projects'}).get('content'))
-        return next(OverleafClient.filter_projects(json_content, {"name": project_name}), None)
+        return next(OverleafClient.filter_projects(self._fetch_projects(), {"name": project_name}), None)
 
     def download_project(self, project_id):
         """
@@ -138,7 +154,7 @@ class OverleafClient(object):
 
         if r.ok:
             return json.loads(r.content)
-        elif r.status_code == str(400):
+        elif r.status_code == 400:
             # Folder already exists
             return
         else:
@@ -155,37 +171,38 @@ class OverleafClient(object):
         """
         project_infos = None
 
-        # Callback function for the joinProject emitter
-        def set_project_infos(a, project_infos_dict, c, d):
+        # Callback for the joinProjectResponse event, which the server emits right after connecting
+        def set_project_infos(response, *_):
             # Set project_infos variable in outer scope
             nonlocal project_infos
-            project_infos = project_infos_dict
+            project_infos = response.get('project')
 
-        # Convert cookie from CookieJar to string
-        cookie = "GCLB={}; overleaf_session2={}" \
-            .format(
-            self._cookie["GCLB"],
-            self._cookie["overleaf_session2"]
-        )
+        # Convert cookies (dict or CookieJar, GCLB is no longer set by Overleaf) to a header string
+        cookie = "; ".join("{}={}".format(k, v) for k, v in dict(self._cookie).items())
 
-        # Connect to Overleaf Socket.IO, send a time parameter and the cookies
+        # Connect to Overleaf Socket.IO. The project is now joined via the `projectId` query parameter
+        # instead of a `joinProject` emit. The websocket upgrade fails with 502, so use xhr-polling.
         socket_io = SocketIO(
             BASE_URL,
-            params={'t': int(time.time())},
-            headers={'Cookie': cookie}
+            params={'t': int(time.time()), 'projectId': project_id},
+            headers={'Cookie': cookie},
+            transports=['xhr-polling'],
+            # socketIO-client defaults to verify=False, which would send the session cookie without TLS verification
+            verify=True
         )
+        socket_io.on('joinProjectResponse', set_project_infos)
 
-        # Wait until we connect to the socket
-        socket_io.on('connect', lambda: None)
-        socket_io.wait_for_callbacks()
-
-        # Send the joinProject event and receive the project infos
-        socket_io.emit('joinProject', {'project_id': project_id}, set_project_infos)
-        socket_io.wait_for_callbacks()
+        deadline = time.time() + JOIN_PROJECT_TIMEOUT
+        while project_infos is None and time.time() < deadline:
+            socket_io.wait(seconds=1)
 
         # Disconnect from the socket if still connected
         if socket_io.connected:
             socket_io.disconnect()
+
+        if project_infos is None:
+            raise reqs.HTTPError("No joinProjectResponse received from Overleaf within {}s".format(
+                JOIN_PROJECT_TIMEOUT))
 
         return project_infos
 
@@ -239,7 +256,10 @@ class OverleafClient(object):
         # Upload the file to the predefined folder
         r = reqs.post(UPLOAD_URL.format(project_id), cookies=self._cookie, params=params, files=files)
 
-        return r.status_code == str(200) and json.loads(r.content)["success"]
+        # Raise instead of returning False, the sync loop ignores return values and would report success
+        if not (r.status_code == 200 and json.loads(r.content).get("success")):
+            raise reqs.HTTPError("Upload of {} failed with status {}".format(file_name, r.status_code))
+        return True
 
     def delete_file(self, project_id, project_infos, file_name):
         """
@@ -280,7 +300,7 @@ class OverleafClient(object):
 
         r = reqs.delete(DELETE_URL.format(project_id, file['_id']), cookies=self._cookie, headers=headers, json={})
 
-        return r.status_code == str(204)
+        return r.status_code == 204
 
     def download_pdf(self, project_id):
         """
