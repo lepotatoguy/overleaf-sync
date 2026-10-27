@@ -100,6 +100,8 @@ If refreshing the project after an upload fails, a warning explains that sync hi
 
 Uploads use stable file snapshots, and sync history records the contents actually transferred. Edits saved after a file is uploaded or downloaded remain pending for the next sync.
 
+If multiple active projects share the requested name, the command stops and asks you to rename one in Overleaf.
+
 **One-way sync (`-l`, `-r`).** These use the same history: a file is only overwritten without asking if the other side didn't change it since the last sync. They also handle files deleted on one side: you can delete them on the other side as well, restore them, or ignore them. (Two-way sync never deletes files.)
 
 Example output of a two-way sync:

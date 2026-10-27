@@ -15,6 +15,7 @@ All notable changes to this project are documented here. The format is based on
 - Report rejected remote deletions as failures.
 - Avoid stale sync history after a failed post-upload refresh, including restored files, and show a warning.
 - Keep local and remote edits made during sync pending by recording transferred snapshots rather than later file contents.
+- Reject ambiguous active project names with a clear error instead of selecting the first match.
 
 ## [2.0.0] - 2026-10-26
 

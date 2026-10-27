@@ -47,6 +47,10 @@ class SessionExpiredError(Exception):
     """The persisted session is no longer valid (Overleaf redirects to its login page)"""
 
 
+class AmbiguousProjectError(ValueError):
+    """Several active projects have the requested name."""
+
+
 def _request(method, url, session=None, **kwargs):
     """requests.request (or session.request) that waits and retries when Overleaf's rate limit is reached"""
     requester = session or reqs
@@ -155,7 +159,12 @@ class OverleafClient(object):
         """
 
         json_content = OverleafClient._extract_projects(self._dashboard().content)
-        return next(OverleafClient.filter_projects(json_content, {"name": project_name}), None)
+        projects = list(OverleafClient.filter_projects(json_content, {"name": project_name}))
+        if len(projects) > 1:
+            raise AmbiguousProjectError(
+                f"Multiple active projects are named {project_name!r}. Rename one of them in Overleaf, then try again."
+            )
+        return projects[0] if projects else None
 
     def download_project(self, project_id):
         """
