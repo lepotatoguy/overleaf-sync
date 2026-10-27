@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 import tempfile
+import warnings
 from pathlib import Path
 
 # Stored in the sync folder. Dotfiles are never uploaded (glob skips them), so it stays local.
@@ -46,7 +47,19 @@ def load_state(sync_dir, server, project_id):
         or state.get("project_id") != project_id
     ):
         return {}
-    return state.get("files", {})
+    files = state.get("files", {})
+    if not isinstance(files, dict) or any(
+        not isinstance(entry, dict)
+        or any(not isinstance(entry.get(side), str) or not entry[side] for side in ("local", "remote"))
+        for entry in files.values()
+    ):
+        warnings.warn(
+            "Ignoring invalid sync history; conflicting files will require confirmation.",
+            UserWarning,
+            stacklevel=2,
+        )
+        return {}
+    return files
 
 
 def save_state(sync_dir, server, project_id, files):

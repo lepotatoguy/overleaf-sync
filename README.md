@@ -90,6 +90,8 @@ ols [-l | -r] [-n NAME] [-p PATH] [-i OLIGNORE] [--auth-file PATH] [--server URL
 
 On the very first sync there's no history yet, so you're asked about every file that differs between your folder and Overleaf.
 
+If sync history contains malformed file entries, it is ignored with a warning. Files that differ locally and remotely still require confirmation.
+
 **One-way sync (`-l`, `-r`).** These use the same history: a file is only overwritten without asking if the other side didn't change it since the last sync. They also handle files deleted on one side: you can delete them on the other side as well, restore them, or ignore them. (Two-way sync never deletes files.)
 
 Example output of a two-way sync:
