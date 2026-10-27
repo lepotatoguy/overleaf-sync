@@ -185,3 +185,15 @@ def test_rejected_upload_is_not_recorded_as_synced(project, monkeypatch):
     output = ols()
     assert FakeOverleaf.files["main.tex"] == b"v2 local"
     assert "Conflict" not in output
+
+
+def test_rejected_remote_deletion_fails_without_reporting_success(project, monkeypatch):
+    FakeOverleaf.files = {"main.tex": b"v1"}
+    ols()
+    (project / "main.tex").unlink()
+    monkeypatch.setattr(FakeOverleaf, "delete_file", lambda self, *args: False)
+    result = CliRunner().invoke(cli.main, ["-l"], input="d\n", catch_exceptions=False)
+    assert result.exit_code != 0
+    assert "deleting" in result.output
+    assert "Synced files from [local] to [remote]" not in result.output
+    assert FakeOverleaf.files["main.tex"] == b"v1"

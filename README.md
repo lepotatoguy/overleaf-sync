@@ -94,6 +94,8 @@ If sync history contains malformed file entries, it is ignored with a warning. F
 
 Downloaded files are written to a temporary file before replacing the local copy, so a failed write leaves the previous file intact. Existing file permissions and symlinks are preserved.
 
+Rejected uploads and deletions stop one-way sync instead of being reported as successful.
+
 **One-way sync (`-l`, `-r`).** These use the same history: a file is only overwritten without asking if the other side didn't change it since the last sync. They also handle files deleted on one side: you can delete them on the other side as well, restore them, or ignore them. (Two-way sync never deletes files.)
 
 Example output of a two-way sync:

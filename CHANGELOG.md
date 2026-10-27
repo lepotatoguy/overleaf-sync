@@ -12,6 +12,7 @@ All notable changes to this project are documented here. The format is based on
 - Recognize GUI login completion when the project dashboard URL contains query parameters.
 - Ignore malformed per-file sync history with a warning instead of crashing or trusting incomplete entries.
 - Replace downloaded files atomically so failed writes preserve the previous copy, permissions, and symlinks.
+- Report rejected remote deletions as failures.
 
 ## [2.0.0] - 2026-10-26
 
