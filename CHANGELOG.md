@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- Show contextual text diffs before conflict choices and one-way overwrite confirmations, with terminal colors, binary fallback, and bounded output.
+
 ### Fixed
 
 - Reject failed one-way uploads instead of reporting success or recording them as synchronized.

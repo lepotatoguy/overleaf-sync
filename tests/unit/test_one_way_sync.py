@@ -320,3 +320,14 @@ def test_edit_mid_transfer_does_not_change_the_uploaded_snapshot(project, monkey
     output = ols(input="s\n")
     assert "Conflict" not in output
     assert FakeOverleaf.files["main.tex"] == edited
+
+
+@pytest.mark.parametrize("args", [["-l"], ["-r"]])
+def test_one_way_overwrite_shows_a_conflict_preview(project, args):
+    FakeOverleaf.files = {"main.tex": b"remote edit\n"}
+    (project / "main.tex").write_bytes(b"local edit\n")
+    output = ols(*args, input="n\n")
+    assert "--- local/main.tex" in output and "+++ remote/main.tex" in output
+    assert output.index("+remote edit") < output.index("Overwrite it")
+    assert FakeOverleaf.files["main.tex"] == b"remote edit\n"
+    assert (project / "main.tex").read_bytes() == b"local edit\n"

@@ -102,6 +102,16 @@ Uploads use stable file snapshots, and sync history records the contents actuall
 
 If multiple active projects share the requested name, the command stops and asks you to rename one in Overleaf.
 
+Before asking how to resolve a conflict, the CLI shows a unified text diff: removed local lines in red and added remote lines in green when the terminal supports color. This also applies before one-way overwrite confirmations. Binary or non-UTF-8 files show a short explanation instead. Previews are limited to 200 diff lines, with an explicit truncation message.
+
+```diff
+--- local/main.tex
++++ remote/main.tex
+@@ -1 +1 @@
+-Local paragraph
++Remote paragraph
+```
+
 **One-way sync (`-l`, `-r`).** These use the same history: a file is only overwritten without asking if the other side didn't change it since the last sync. They also handle files deleted on one side: you can delete them on the other side as well, restore them, or ignore them. (Two-way sync never deletes files.)
 
 Example output of a two-way sync:
