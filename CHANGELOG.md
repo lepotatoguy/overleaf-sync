@@ -13,6 +13,7 @@ All notable changes to this project are documented here. The format is based on
 - Ignore malformed per-file sync history with a warning instead of crashing or trusting incomplete entries.
 - Replace downloaded files atomically so failed writes preserve the previous copy, permissions, and symlinks.
 - Report rejected remote deletions as failures.
+- Avoid stale sync history after a failed post-upload refresh, including restored files, and show a warning.
 
 ## [2.0.0] - 2026-10-26
 

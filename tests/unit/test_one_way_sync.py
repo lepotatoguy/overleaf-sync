@@ -197,3 +197,35 @@ def test_rejected_remote_deletion_fails_without_reporting_success(project, monke
     assert "deleting" in result.output
     assert "Synced files from [local] to [remote]" not in result.output
     assert FakeOverleaf.files["main.tex"] == b"v1"
+
+
+@pytest.mark.parametrize("restore", [False, True])
+def test_failed_post_upload_refresh_does_not_create_false_conflict(project, monkeypatch, restore):
+    if restore:
+        FakeOverleaf.files = {}
+        (project / "main.tex").write_bytes(b"v2")
+        args, answer = ["-r"], "r\n"
+    else:
+        FakeOverleaf.files = {"main.tex": b"v1"}
+        ols()
+        (project / "main.tex").write_bytes(b"v2")
+        args, answer = ["-l"], None
+    real_download = FakeOverleaf.download_project
+    calls = 0
+
+    def fail_refresh(self, project_id):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise OSError("temporary refresh failure")
+        return real_download(self, project_id)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(FakeOverleaf, "download_project", fail_refresh)
+        output = ols(*args, input=answer)
+    assert "Warning" in output and "refresh" in output
+    assert FakeOverleaf.files["main.tex"] == b"v2"
+    (project / "main.tex").write_bytes(b"v3")
+    output = ols(input="s\n")
+    assert "Conflict" not in output
+    assert FakeOverleaf.files["main.tex"] == b"v3"
